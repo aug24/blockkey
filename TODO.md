@@ -1,17 +1,28 @@
-# Add field for adding signature
+# Server
 
-# Add a signature generator to the client
+At present it does not manage a local store, or join a chain.  
 
-# Add a signature checker to the client
+ * Docker image generation (easier to run multiple nodes)
+ * Optional seeds parameter for additional nodes
+ * Add a signature checker 
+ * Conflict resolution?
+ * Local keyserver functionality?  
+ * Search for keys?
 
-# Conflict resolution?
+# Client
 
-# Local keyserver functionality?  Search for keys?
+At present it does not manage signing of keys and adding the signature to the block, as a one-step operations.
 
-# Autosign algorithm
+ * Import local gpg key and infer email
+ * Add field for adding signature
+ * Add a signature generator to the client - one step to sign and update the block
+ * Autosign algorithm
+ * Autorotate key
 
-# Docker image generation (easier to run multiple nodes)
+# General
 
-# Optional seeds parameter for additional nodes
+ * Horizon (sunset) for keys
+
+
 
 
