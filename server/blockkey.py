@@ -5,145 +5,14 @@ import time
 from flask import Flask, request
 import requests
 
-
-class Block:
-    def __init__(self, index, transactions, timestamp, previous_hash, nonce=0):
-        self.index = index
-        self.transactions = transactions
-        self.timestamp = timestamp
-        self.previous_hash = previous_hash
-        self.nonce = nonce
-
-    def compute_hash(self):
-        """
-        A function that return the hash of the block contents.
-        """
-        block_string = json.dumps(self.__dict__, sort_keys=True)
-        return sha256(block_string.encode()).hexdigest()
-
-
-class Blockchain:
-    # difficulty of our PoW algorithm
-    difficulty = 2
-
-    def __init__(self):
-        self.unconfirmed_transactions = []
-        self.chain = []
-
-    def create_genesis_block(self):
-        """
-        A function to generate genesis block and appends it to
-        the chain. The block has index 0, previous_hash as 0, and
-        a valid hash.
-        """
-        genesis_block = Block(0, [], time.time(), "0")
-        genesis_block.hash = genesis_block.compute_hash()
-        self.chain.append(genesis_block)
-
-    @property
-    def last_block(self):
-        return self.chain[-1]
-
-    def add_block(self, block, proof):
-        """
-        A function that adds the block to the chain after verification.
-        Verification includes:
-        * Checking if the proof is valid.
-        * The previous_hash referred in the block and the hash of latest block
-          in the chain match.
-        """
-        previous_hash = self.last_block.hash
-
-        if previous_hash != block.previous_hash:
-            return False
-
-        if not Blockchain.is_valid_proof(block, proof):
-            return False
-
-        block.hash = proof
-        self.chain.append(block)
-        return True
-
-    def proof_of_work(self, block):
-        """
-        Function that tries different values of nonce to get a hash
-        that satisfies our difficulty criteria.
-        """
-        block.nonce = 0
-
-        computed_hash = block.compute_hash()
-        while not computed_hash.startswith('0' * Blockchain.difficulty):
-            block.nonce += 1
-            computed_hash = block.compute_hash()
-
-        return computed_hash
-
-    def add_new_transaction(self, transaction):
-        self.unconfirmed_transactions.append(transaction)
-
-    @classmethod
-    def is_valid_proof(cls, block, block_hash):
-        """
-        Check if block_hash is valid hash of block and satisfies
-        the difficulty criteria.
-        """
-        return (block_hash.startswith('0' * Blockchain.difficulty) and
-                block_hash == block.compute_hash())
-
-    @classmethod
-    def check_chain_validity(cls, chain):
-        result = True
-        previous_hash = "0"
-
-        for block in chain:
-            block_hash = block.hash
-            # remove the hash field to recompute the hash again
-            # using `compute_hash` method.
-            delattr(block, "hash")
-
-            if not cls.is_valid_proof(block, block.hash) or \
-                    previous_hash != block.previous_hash:
-                result = False
-                break
-
-            block.hash, previous_hash = block_hash, block_hash
-
-        return result
-
-    def mine(self):
-        """
-        This function serves as an interface to add the pending
-        transactions to the blockchain by adding them to the block
-        and figuring out Proof Of Work.
-        """
-        if not self.unconfirmed_transactions:
-            return False
-
-        last_block = self.last_block
-
-        new_block = Block(index=last_block.index + 1,
-                          transactions=self.unconfirmed_transactions,
-                          timestamp=time.time(),
-                          previous_hash=last_block.hash)
-
-        proof = self.proof_of_work(new_block)
-        self.add_block(new_block, proof)
-
-        self.unconfirmed_transactions = []
-        # announce it to the network
-        announce_new_block(new_block)
-        return new_block.index
-
+from block.Block import Block
+from block.Blockchain import Blockchain
 
 app = Flask(__name__)
 
 # the node's copy of blockchain
 blockchain = Blockchain()
 blockchain.create_genesis_block()
-
-# the address to other participating members of the network
-peers = set()
-
 
 # endpoint to submit a new transaction. This will be used by
 # our application to add new data (posts) to the blockchain
@@ -176,7 +45,7 @@ def get_chain():
         chain_data.append(block.__dict__)
     return json.dumps({"length": len(chain_data),
                        "chain": chain_data,
-                       "peers": list(peers)})
+                       "peers": list(blockchain.peers)})
 
 
 # endpoint to request the node to mine the unconfirmed
@@ -198,7 +67,7 @@ def register_new_peers():
         return "Invalid data", 400
 
     # Add the node to the peer list
-    peers.add(node_address)
+    blockchain.peers.add(node_address)
 
     # Return the consensus blockchain to the newly registered node
     # so that he can sync
@@ -229,7 +98,7 @@ def register_with_existing_node():
         # update chain and the peers
         chain_dump = response.json()['chain']
         blockchain = create_chain_from_dump(chain_dump)
-        peers.update(response.json()['peers'])
+        blockchain.peers.update(response.json()['peers'])
         return "Registration successful", 200
     else:
         # if something goes wrong, pass it on to the API response
@@ -289,7 +158,7 @@ def consensus():
     longest_chain = None
     current_len = len(blockchain.chain)
 
-    for node in peers:
+    for node in blockchain.peers:
         print('{}/chain'.format(node))
         response = requests.get('{}chain'.format(node))
         print("Content", response.content)
@@ -306,12 +175,3 @@ def consensus():
     return False
 
 
-def announce_new_block(block):
-    """
-    A function to announce to the network once a block has been mined.
-    Other blocks can simply verify the proof of work and add it to their
-    respective chains.
-    """
-    for peer in peers:
-        url = "{}add_block".format(peer)
-        requests.post(url, data=json.dumps(block.__dict__, sort_keys=True))
