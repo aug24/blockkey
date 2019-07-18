@@ -32,6 +32,7 @@ def new_transaction():
 
     blockchain.add_new_transaction(tx_data)
 
+    result = blockchain.mine()
     return "Success", 201
 
 
@@ -48,17 +49,6 @@ def get_chain():
     return json.dumps({"length": len(chain_data),
                        "chain": chain_data,
                        "peers": list(blockchain.peers)})
-
-
-# endpoint to request the node to mine the unconfirmed
-# transactions (if any). We'll be using it to initiate
-# a command to mine from our application itself.
-@server.route('/mine', methods=['GET'])
-def mine_unconfirmed_transactions():
-    result = blockchain.mine()
-    if not result:
-        return "No transactions to mine"
-    return "Block #{} is mined.".format(result)
 
 
 # endpoint to add new peers to the network.
