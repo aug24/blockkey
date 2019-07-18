@@ -4,7 +4,7 @@ import time
 
 from flask import Flask, request
 import requests
-from block.Block import Block
+from server.block.Block import Block
 
 class Blockchain:
     # the address to other participating members of the network
